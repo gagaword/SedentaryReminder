@@ -11,7 +11,9 @@ public partial class App : Application
     private TaskbarIcon? _tray;
     private ReminderService? _reminder;
     private AppSettings _settings = new();
+    private StatsStore _stats = new();
     private SettingsWindow? _settingsWindow;
+    private StatsWindow? _statsWindow;
 
     private void OnStartup(object sender, StartupEventArgs e)
     {
@@ -26,6 +28,7 @@ public partial class App : Application
         Native.SetCurrentProcessExplicitAppUserModelID(AppUserModelId);
 
         _settings = AppSettings.Load();
+        _stats = StatsStore.Load();
 
         _tray = (TaskbarIcon)FindResource("TrayIcon");
         _tray.ForceCreate();
@@ -63,6 +66,7 @@ public partial class App : Application
         // 计时线程触发，切回 UI 线程处理
         Dispatcher.Invoke(() =>
         {
+            _stats.RecordReminder(_settings.IntervalMinutes);
             if (_settings.ForceMode)
                 ShowForcedBreak();
             else
@@ -84,9 +88,10 @@ public partial class App : Application
 
         _reminder?.Stop(); // 休息期间暂停计时
         _break = new ForcedBreakController(_settings.RestSeconds);
-        _break.Finished += (_, _) =>
+        _break.Finished += (_, skipped) =>
         {
             _break = null;
+            _stats.RecordBreak(skipped);
             ApplySettingsToReminder(); // 休息结束，开始下一轮计时
             Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.ApplicationIdle,
                 new Action(() => { GC.Collect(); GC.Collect(); Native.TrimWorkingSet(); }));
@@ -125,6 +130,26 @@ public partial class App : Application
         };
         _settingsWindow.Show();
         _settingsWindow.Activate();
+    }
+
+    private void OnOpenStats(object sender, RoutedEventArgs e)
+    {
+        if (_statsWindow is not null)
+        {
+            _statsWindow.Activate();
+            return;
+        }
+
+        // 与设置窗口同样按需创建、关闭即释放
+        _statsWindow = new StatsWindow(_stats);
+        _statsWindow.Closed += (_, _) =>
+        {
+            _statsWindow = null;
+            Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.ApplicationIdle,
+                new Action(() => { GC.Collect(); GC.Collect(); Native.TrimWorkingSet(); }));
+        };
+        _statsWindow.Show();
+        _statsWindow.Activate();
     }
 
     private void OnResetTimer(object sender, RoutedEventArgs e)

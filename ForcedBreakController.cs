@@ -22,7 +22,8 @@ public sealed class ForcedBreakController
     private double _escElapsed;
     private BreakOverlayWindow? _focusWindow;
 
-    public event EventHandler? Finished;
+    /// <summary>休息结束时触发；参数为 true 表示被长按 ESC 提前退出。</summary>
+    public event EventHandler<bool>? Finished;
 
     public ForcedBreakController(int restSeconds)
     {
@@ -51,7 +52,7 @@ public sealed class ForcedBreakController
 
         if (_windows.Count == 0) // 极端兜底：拿不到显示器信息
         {
-            Finished?.Invoke(this, EventArgs.Empty);
+            Finished?.Invoke(this, false);
             return;
         }
 
@@ -72,7 +73,7 @@ public sealed class ForcedBreakController
         _remaining--;
         if (_remaining <= 0)
         {
-            CloseAll();
+            CloseAll(skipped: false);
             return;
         }
         foreach (var w in _windows) w.SetCountdown(_remaining);
@@ -103,7 +104,7 @@ public sealed class ForcedBreakController
         _escElapsed += _escHold.Interval.TotalMilliseconds;
         var frac = Math.Min(1.0, _escElapsed / EscHoldMs);
         foreach (var w in _windows) w.SetEscProgress(frac);
-        if (_escElapsed >= EscHoldMs) CloseAll();
+        if (_escElapsed >= EscHoldMs) CloseAll(skipped: true);
     }
 
     private void OnWindowDeactivated(object? sender, EventArgs e)
@@ -123,7 +124,7 @@ public sealed class ForcedBreakController
         if (!_closing) e.Cancel = true;
     }
 
-    private void CloseAll()
+    private void CloseAll(bool skipped)
     {
         if (_closing) return;
         _closing = true;
@@ -134,6 +135,6 @@ public sealed class ForcedBreakController
             try { w.Close(); } catch { /* 忽略 */ }
         }
         _windows.Clear();
-        Finished?.Invoke(this, EventArgs.Empty);
+        Finished?.Invoke(this, skipped);
     }
 }

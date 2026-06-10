@@ -26,6 +26,7 @@
                         <MenuItem Header="立即重置计时" Click="OnResetTimer" />
                         <MenuItem x:Name="PauseMenuItem" Header="暂停提醒" Click="OnTogglePause" />
                         <Separator />
+                        <MenuItem Header="统计…" Click="OnOpenStats" />
                         <MenuItem Header="设置…" Click="OnOpenSettings" />
                         <MenuItem Header="退出" Click="OnExitClick" />
                     </ContextMenu>
