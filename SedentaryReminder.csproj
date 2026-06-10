@@ -9,6 +9,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
+    <Version>1.0.1</Version>
     <AssemblyName>SedentaryReminder</AssemblyName>
     <RootNamespace>SedentaryReminder</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
