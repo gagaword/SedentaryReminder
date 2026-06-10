@@ -12,6 +12,7 @@ public partial class App : Application
     private Mutex? _instanceMutex;
     private bool _isDuplicateInstance;
     private TaskbarIcon? _tray;
+    private System.Windows.Threading.DispatcherTimer? _menuTimer;
     private ReminderService? _reminder;
     private AppSettings _settings = new();
     private StatsStore _stats = new();
@@ -52,6 +53,18 @@ public partial class App : Application
         ApplySettingsToReminder();
 
         UpdateMenuState();
+
+        // 倒计时只在菜单打开期间每秒刷新，平时零开销
+        _menuTimer = new System.Windows.Threading.DispatcherTimer
+        {
+            Interval = TimeSpan.FromSeconds(1),
+        };
+        _menuTimer.Tick += (_, _) => UpdateStatusText();
+        if (_tray.ContextMenu is { } menu)
+        {
+            menu.Opened += (_, _) => { UpdateStatusText(); _menuTimer.Start(); };
+            menu.Closed += (_, _) => _menuTimer.Stop();
+        }
 
         // 启动峰值过后回收一次，压低常驻内存
         Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.ApplicationIdle,
@@ -182,11 +195,24 @@ public partial class App : Application
 
     private void UpdateMenuState()
     {
-        if (StatusMenuItemRef is { } status)
-            status.Header = _settings.Enabled ? "状态：运行中" : "状态：已暂停";
+        UpdateStatusText();
         if (PauseMenuItemRef is { } pause)
             pause.Header = _settings.Enabled ? "暂停提醒" : "恢复提醒";
     }
+
+    private void UpdateStatusText()
+    {
+        if (StatusMenuItemRef is not { } status) return;
+        status.Header = !_settings.Enabled ? "状态：已暂停"
+            : _break is not null ? "状态：强制休息中"
+            : _reminder?.Remaining is { } left ? $"状态：距提醒 {FormatRemaining(left)}"
+            : "状态：已暂停";
+    }
+
+    private static string FormatRemaining(TimeSpan t) =>
+        t.TotalHours >= 1
+            ? $"{(int)t.TotalHours}:{t.Minutes:00}:{t.Seconds:00}"
+            : $"{t.Minutes}:{t.Seconds:00}";
 
     // ContextMenu 在资源里，名称引用通过 LogicalTree 查找
     private System.Windows.Controls.MenuItem? StatusMenuItemRef =>
