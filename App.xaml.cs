@@ -7,7 +7,10 @@ namespace SedentaryReminder;
 public partial class App : Application
 {
     private const string AppUserModelId = "SedentaryReminder.App";
+    private const string MutexName = "SedentaryReminder.App.SingleInstance";
 
+    private Mutex? _instanceMutex;
+    private bool _isDuplicateInstance;
     private TaskbarIcon? _tray;
     private ReminderService? _reminder;
     private AppSettings _settings = new();
@@ -17,6 +20,17 @@ public partial class App : Application
 
     private void OnStartup(object sender, StartupEventArgs e)
     {
+        // 单实例：拿不到命名互斥锁说明已有实例在运行，提示后退出
+        _instanceMutex = new Mutex(initiallyOwned: true, MutexName, out var createdNew);
+        if (!createdNew)
+        {
+            _isDuplicateInstance = true;
+            MessageBox.Show("久坐提醒已经在运行中了，请留意系统托盘右下角的图标。",
+                "久坐提醒", MessageBoxButton.OK, MessageBoxImage.Information);
+            Shutdown();
+            return;
+        }
+
         // 兜底：UI 线程异常记录到日志，避免后台工具直接消失
         DispatcherUnhandledException += (_, args) =>
         {
@@ -205,9 +219,14 @@ public partial class App : Application
 
     private void OnExit(object sender, ExitEventArgs e)
     {
+        // 重复实例退出时不能清理 Toast 注册等共享状态，否则会影响正在运行的实例
+        if (_isDuplicateInstance) return;
+
         _reminder?.Stop();
         _reminder?.Dispose();
         _tray?.Dispose();
         ToastNotificationManagerCompat.Uninstall();
+        _instanceMutex?.ReleaseMutex();
+        _instanceMutex?.Dispose();
     }
 }
