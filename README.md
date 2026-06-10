@@ -35,10 +35,20 @@ dotnet restore
 dotnet run
 ```
 
-## 发布（单文件，依赖框架运行时）
+## 发布
+
+单文件、依赖系统已安装的 .NET 运行时（体积小）：
 
 ```powershell
 dotnet publish -c Release -r win-x64 --self-contained false
+```
+
+单文件、自包含（免装 .NET，下载即用，[Releases](https://github.com/gagaword/SedentaryReminder/releases) 提供的就是此版本）：
+
+```powershell
+dotnet publish -c Release -r win-x64 --self-contained true `
+  /p:PublishSingleFile=true /p:EnableCompressionInSingleFile=true `
+  /p:IncludeNativeLibrariesForSelfExtract=true
 ```
 
 > 配置文件位于 `%AppData%\SedentaryReminder\settings.json`。
